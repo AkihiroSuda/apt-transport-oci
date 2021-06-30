@@ -295,9 +295,27 @@ func (m *Method) acquire(ctx context.Context, msg *apt.Message) (started bool, e
 	}
 	defer w.Close()
 
-	if _, err := io.Copy(w, r); err != nil {
+	digester := digest.SHA256.Digester()
+	hasher := digester.Hash()
+	mw := io.MultiWriter(w, hasher)
+
+	if _, err := io.Copy(mw, r); err != nil {
 		// TODO: show progress
 		return started, err
+	}
+
+	if err := w.Close(); err != nil {
+		return started, err
+	}
+
+	if err := r.Close(); err != nil {
+		return started, err
+	}
+
+	dig := digester.Digest()
+
+	if desc.Digest.Algorithm() == dig.Algorithm() && desc.Digest.Encoded() != dig.Encoded() {
+		return started, fmt.Errorf("expected digest of %q to be %s, got %s", title, desc.Digest, dig)
 	}
 
 	const (
@@ -306,11 +324,7 @@ func (m *Method) acquire(ctx context.Context, msg *apt.Message) (started bool, e
 	)
 	fields := []apt.Field{
 		{Key: FieldSize, Value: strconv.Itoa(int(desc.Size))},
-	}
-	if desc.Digest.Algorithm() == digest.SHA256 {
-		fields = append(fields,
-			apt.Field{Key: FieldSHA256Hash, Value: strings.TrimPrefix(desc.Digest.String(), "sha256:")},
-		)
+		{Key: FieldSHA256Hash, Value: dig.Encoded()},
 	}
 	m.w.FinishURI(uri, filename, resumePoint, altIMSHit, imsHit, usedMirror, fields...)
 	return started, nil
