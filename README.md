@@ -67,3 +67,5 @@ The spec corresponds to the behavior of `oras push IMAGE FILE1:application/octet
 - An image index MAY have multiple manifests, but all the manifests SHOULD refer to the same set of layers (because `apt-get` itself supports multi-arch repo).
 - A layer MUST have `org.opencontainers.image.title` annotation that corresponds to the file name.
 - A layer SHOULD have one of the following media types:
+ - `application/octet-stream`
+ - `application/x-binary`
