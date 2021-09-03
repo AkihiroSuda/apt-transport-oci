@@ -181,10 +181,47 @@ func buildFileMap(ctx context.Context, fetcher remotes.Fetcher, rootDesc ocispec
 	return files, nil
 }
 
+func parseURI(uri string) (repo, path string, _ error) {
+	// The format here would be something like: registry.somehost.com/some/repo:tag/SomeFile
+
+	trimmed := strings.TrimPrefix(uri, "oci://")
+	if trimmed == uri {
+		return "", "", fmt.Errorf("missing oci:// protocol in uri")
+	}
+
+	split := strings.SplitN(trimmed, ":", 2)
+	if len(split) < 2 {
+		return "", "", fmt.Errorf("uri is missing repo tag")
+	}
+
+	// Combine everything up to but not including the tag
+	// We don't quite have the tag yet because it (should) have a file path added
+	// to the end that we need to split off first.
+	repo = "oci://" + split[0] + ":"
+	tagAndFile := strings.SplitN(split[1], "/", 2)
+
+	// We add "/" here, otherwise we'll end up with an extra preceding "/" on the
+	// file name later which we don't want and will cause the file to not be found.
+	repo += tagAndFile[0] + "/"
+
+	if len(tagAndFile) > 1 {
+		path = tagAndFile[1]
+	}
+
+	return repo, path, nil
+}
+
 func parseURIFields(msg *apt.Message) (ociRef refdocker.Named, title string, err error) {
 	repoURI := msg.Fields[FieldTargetRepoURI]
 	if repoURI == "" {
-		return ociRef, "", fmt.Errorf("missing field %q", FieldTargetRepoURI)
+		uri := msg.Fields[FieldURI]
+		if uri == "" {
+			return ociRef, "", fmt.Errorf("missing field %q", FieldTargetRepoURI)
+		}
+		repoURI, _, err = parseURI(uri)
+		if err != nil {
+			return ociRef, "", err
+		}
 	}
 	if !strings.HasPrefix(repoURI, "oci://") {
 		return ociRef, "", fmt.Errorf("field %s lacks \"oci://\" prefix: %q", FieldTargetRepoURI, repoURI)
