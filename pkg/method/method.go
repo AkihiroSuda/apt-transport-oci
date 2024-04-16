@@ -18,7 +18,7 @@ import (
 	"github.com/containerd/containerd/images"
 	refdocker "github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/nerdctl/pkg/imgutil/dockerconfigresolver"
+	"github.com/AkihiroSuda/apt-transport-oci/pkg/dockerconfigresolver"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
