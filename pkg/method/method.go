@@ -14,10 +14,10 @@ import (
 	"strings"
 
 	"github.com/AkihiroSuda/apt-transport-oci/pkg/version"
-	"github.com/cloudflare/apt-transport-cloudflared/apt"
 	"github.com/containerd/containerd/images"
 	refdocker "github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/remotes"
+	"github.com/AkihiroSuda/apt-transport-oci/pkg/apt"
 	"github.com/AkihiroSuda/apt-transport-oci/pkg/dockerconfigresolver"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
