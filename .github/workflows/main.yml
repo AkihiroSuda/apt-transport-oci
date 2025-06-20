@@ -1,0 +1,29 @@
+name: CI
+on:
+  push:
+    branches:
+      - master
+      - 'release/**'
+  pull_request:
+jobs:
+  main:
+    env:
+      GOTOOLCHAIN: local
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["stable", "oldstable"]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go test -v ./...
+      - run: go build ./cmd/usr-lib-apt-methods-oci
+      - run: sudo cp -a usr-lib-apt-methods-oci /usr/lib/apt/methods/oci
+      - run: echo "deb [trusted=yes] oci://ghcr.io/akihirosuda/hello-apt-transport-oci:latest /" | sudo tee /etc/apt/sources.list.d/oci.list
+      - run: sudo apt-get update
+      - run: sudo apt-get install hello-apt-transport-oci
+      - run: hello-apt-transport-oci
