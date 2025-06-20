@@ -13,12 +13,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/AkihiroSuda/apt-transport-oci/pkg/version"
-	"github.com/containerd/containerd/images"
-	refdocker "github.com/containerd/containerd/reference/docker"
-	"github.com/containerd/containerd/remotes"
 	"github.com/AkihiroSuda/apt-transport-oci/pkg/apt"
 	"github.com/AkihiroSuda/apt-transport-oci/pkg/dockerconfigresolver"
+	"github.com/AkihiroSuda/apt-transport-oci/pkg/version"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes"
+	refdocker "github.com/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

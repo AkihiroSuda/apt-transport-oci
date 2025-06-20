@@ -27,8 +27,8 @@ import (
 	"crypto/tls"
 	"net/http"
 
-	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
 	dockercliconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/credentials"
 	dockercliconfigtypes "github.com/docker/cli/cli/config/types"
