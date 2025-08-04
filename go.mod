@@ -3,7 +3,7 @@ module github.com/AkihiroSuda/apt-transport-oci
 go 1.23.0
 
 require (
-	github.com/containerd/containerd/v2 v2.1.3
+	github.com/containerd/containerd/v2 v2.1.4
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v28.3.0+incompatible
 	github.com/opencontainers/go-digest v1.0.0
