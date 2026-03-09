@@ -5,7 +5,7 @@ go 1.24.3
 require (
 	github.com/containerd/containerd/v2 v2.2.1
 	github.com/distribution/reference v0.6.0
-	github.com/docker/cli v29.2.1+incompatible
+	github.com/docker/cli v29.3.0+incompatible
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/sirupsen/logrus v1.9.4
