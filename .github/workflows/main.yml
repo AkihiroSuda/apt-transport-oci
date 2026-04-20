@@ -23,7 +23,15 @@ jobs:
       - run: go test -v ./...
       - run: go build ./cmd/usr-lib-apt-methods-oci
       - run: sudo cp -a usr-lib-apt-methods-oci /usr/lib/apt/methods/oci
-      - run: echo "deb [trusted=yes] oci://ghcr.io/akihirosuda/hello-apt-transport-oci:latest /" | sudo tee /etc/apt/sources.list.d/oci.list
+      - run: |
+          sudo tee /etc/apt/sources.list.d/oci.sources <<EOF
+          Types: deb
+          URIs: oci://ghcr.io/akihirosuda/hello-apt-transport-oci:latest
+          Suites: stable
+          Components: main
+          Signed-By: /etc/apt/keyrings/AkihiroSuda.gpg
+          EOF
+      - run: curl -fsSL https://github.com/AkihiroSuda.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/AkihiroSuda.gpg
       - run: sudo apt-get update
       - run: sudo apt-get install hello-apt-transport-oci
       - run: hello-apt-transport-oci
