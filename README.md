@@ -30,7 +30,7 @@ sudo go build -o /usr/lib/apt/methods/oci ./cmd/usr-lib-apt-methods-oci
 </details>
 
 ## Example
-The following example installs the `hello-apt-transport-oci` package from the [`oci://ghcr.io/akihirosuda/apt-transport-oci-examples/hello-apt-transport-oci`](https://ghcr.io/akihirosuda/apt-transport-oci-examples/hello-apt-transport-oci) image.
+The following example installs the `hello-apt-transport-oci` package from the [`oci://ghcr.io/akihirosuda/apt-transport-oci-examples:latest`](https://ghcr.io/akihirosuda/apt-transport-oci-examples:latest) image.
 
 > [!TIP]
 > See <https://github.com/AkihiroSuda/apt-transport-oci-examples> for how to build and push this package to your own registry.
@@ -38,7 +38,7 @@ The following example installs the `hello-apt-transport-oci` package from the [`
 - Create `/etc/apt/sources.list.d/oci.sources` with the following content:
 ```
 Types: deb
-URIs: oci://ghcr.io/akihirosuda/apt-transport-oci-examples/hello-apt-transport-oci:latest
+URIs: oci://ghcr.io/akihirosuda/apt-transport-oci-examples:latest
 Suites: stable
 Components: main
 Signed-By: /etc/apt/keyrings/apt-transport-oci-examples.gpg
