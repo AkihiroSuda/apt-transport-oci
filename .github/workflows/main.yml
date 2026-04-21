@@ -26,12 +26,14 @@ jobs:
       - run: |
           sudo tee /etc/apt/sources.list.d/oci.sources <<EOF
           Types: deb
-          URIs: oci://ghcr.io/akihirosuda/hello-apt-transport-oci:latest
+          URIs: oci://ghcr.io/akihirosuda/apt-transport-oci-examples/hello-apt-transport-oci:latest
           Suites: stable
           Components: main
-          Signed-By: /etc/apt/keyrings/AkihiroSuda.gpg
+          Signed-By: /etc/apt/keyrings/apt-transport-oci-examples.gpg
           EOF
-      - run: curl -fsSL https://github.com/AkihiroSuda.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/AkihiroSuda.gpg
+      - run: |
+          curl -fsSL https://raw.githubusercontent.com/AkihiroSuda/apt-transport-oci-examples/refs/heads/master/apt-transport-oci-examples.gpg \
+            | sudo gpg --dearmor -o /etc/apt/keyrings/apt-transport-oci-examples.gpg
       - run: sudo apt-get update
       - run: sudo apt-get install hello-apt-transport-oci
       - run: hello-apt-transport-oci
