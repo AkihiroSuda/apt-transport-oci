@@ -30,23 +30,24 @@ sudo go build -o /usr/lib/apt/methods/oci ./cmd/usr-lib-apt-methods-oci
 </details>
 
 ## Example
-The following example installs the `hello-apt-transport-oci` package from the [`oci://ghcr.io/akihirosuda/hello-apt-transport-oci`](https://ghcr.io/akihirosuda/hello-apt-transport-oci) repo.
+The following example installs the `hello-apt-transport-oci` package from the [`oci://ghcr.io/akihirosuda/apt-transport-oci-examples/hello-apt-transport-oci`](https://ghcr.io/akihirosuda/apt-transport-oci-examples/hello-apt-transport-oci) image.
 
 > [!TIP]
-> See [`./examples`](./examples) for how to build and push this package to your own registry.
+> See <https://github.com/AkihiroSuda/apt-transport-oci-examples> for how to build and push this package to your own registry.
 
 - Create `/etc/apt/sources.list.d/oci.sources` with the following content:
 ```
 Types: deb
-URIs: oci://ghcr.io/akihirosuda/hello-apt-transport-oci:latest
+URIs: oci://ghcr.io/akihirosuda/apt-transport-oci-examples/hello-apt-transport-oci:latest
 Suites: stable
 Components: main
-Signed-By: /etc/apt/keyrings/AkihiroSuda.gpg
+Signed-By: /etc/apt/keyrings/apt-transport-oci-examples.gpg
 ```
 
 - Register a GPG key:
 ```bash
-curl -fsSL https://github.com/AkihiroSuda.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/AkihiroSuda.gpg
+curl -fsSL https://raw.githubusercontent.com/AkihiroSuda/apt-transport-oci-examples/refs/heads/master/apt-transport-oci-examples.gpg \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/apt-transport-oci-examples.gpg
 ```
 
 - Run:
