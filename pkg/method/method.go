@@ -33,6 +33,7 @@ const (
 	FieldFilename      = "Filename"
 	FieldSize          = "Size"
 	FieldSHA256Hash    = "SHA256-Hash"
+	FieldSHA512Hash    = "SHA512-Hash"
 )
 
 const (
@@ -332,9 +333,8 @@ func (m *Method) acquire(ctx context.Context, msg *apt.Message) (started bool, e
 	}
 	defer w.Close()
 
-	digester := digest.SHA256.Digester()
-	hasher := digester.Hash()
-	mw := io.MultiWriter(w, hasher)
+	sha256Digester, sha512Digester := digest.SHA256.Digester(), digest.SHA512.Digester()
+	mw := io.MultiWriter(w, sha256Digester.Hash(), sha512Digester.Hash())
 
 	if _, err := io.Copy(mw, r); err != nil {
 		// TODO: show progress
@@ -349,10 +349,12 @@ func (m *Method) acquire(ctx context.Context, msg *apt.Message) (started bool, e
 		return started, err
 	}
 
-	dig := digester.Digest()
+	sha256Digest, sha512Digest := sha256Digester.Digest(), sha512Digester.Digest()
 
-	if desc.Digest.Algorithm() == dig.Algorithm() && desc.Digest.Encoded() != dig.Encoded() {
-		return started, fmt.Errorf("expected digest of %q to be %s, got %s", title, desc.Digest, dig)
+	for _, dig := range []digest.Digest{sha256Digest, sha512Digest} {
+		if desc.Digest.Algorithm() == dig.Algorithm() && desc.Digest.Encoded() != dig.Encoded() {
+			return started, fmt.Errorf("expected digest of %q to be %s, got %s", title, desc.Digest, dig)
+		}
 	}
 
 	const (
@@ -361,7 +363,8 @@ func (m *Method) acquire(ctx context.Context, msg *apt.Message) (started bool, e
 	)
 	fields := []apt.Field{
 		{Key: FieldSize, Value: strconv.Itoa(int(desc.Size))},
-		{Key: FieldSHA256Hash, Value: dig.Encoded()},
+		{Key: FieldSHA256Hash, Value: sha256Digest.Encoded()},
+		{Key: FieldSHA512Hash, Value: sha512Digest.Encoded()},
 	}
 	m.w.FinishURI(uri, filename, resumePoint, altIMSHit, imsHit, usedMirror, fields...)
 	return started, nil
