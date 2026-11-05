@@ -30,6 +30,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // CapFlags represents a set of Apt Capabilities.
@@ -256,12 +257,13 @@ func (r *MessageReader) commitMessage(newmsg *Message) *Message {
 
 // MessageWriter is a wrapper around an io.Writer which writes APT messages.
 type MessageWriter struct {
-	w io.Writer
+	mu sync.Mutex
+	w  io.Writer
 }
 
 // NewMessageWriter creates a new MessageWriter.
 func NewMessageWriter(w io.Writer) *MessageWriter {
-	return &MessageWriter{w}
+	return &MessageWriter{w: w}
 }
 
 // WriteMessage writes a generic Message object as created by NewMessage.
@@ -269,6 +271,8 @@ func NewMessageWriter(w io.Writer) *MessageWriter {
 // This method is less efficient than the dedicated message functions, as it
 // has to format every part of the message.
 func (mw *MessageWriter) WriteMessage(msg *Message) {
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
 	fmt.Fprintf(mw.w, "%d %s\n", msg.StatusCode, msg.Description)
 	for k, v := range msg.Fields {
 		if k != "" && v != "" {
@@ -283,6 +287,8 @@ func (mw *MessageWriter) WriteMessage(msg *Message) {
 // Version must be non-empty. caps may be 0 for no capabilities, though
 // it probably should at least be CapSendConfig (or CapDefault)
 func (mw *MessageWriter) Capabilities(version string, caps CapFlags) {
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
 	fmt.Fprintf(mw.w, "100 Capabilities\nVersion: %s\n", version)
 	if caps&CapSendConfig != 0 {
 		mw.w.Write([]byte("Send-Config: true\n"))
@@ -310,6 +316,8 @@ func (mw *MessageWriter) Capabilities(version string, caps CapFlags) {
 
 // Log writes a '101 Log' message.
 func (mw *MessageWriter) Log(msg string) {
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
 	fmt.Fprintf(mw.w, "101 Log\nMessage: %s\n\n", msg)
 }
 
@@ -320,6 +328,8 @@ func (mw *MessageWriter) Logf(fmtspec string, args ...interface{}) {
 
 // Status writes a '102 status' message.
 func (mw *MessageWriter) Status(msg string) {
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
 	fmt.Fprintf(mw.w, "102 Status\nMessage: %s\n\n", msg)
 }
 
@@ -330,6 +340,8 @@ func (mw *MessageWriter) Statusf(fmtspec string, args ...interface{}) {
 
 // Redirect writes a '103 Redirect' message
 func (mw *MessageWriter) Redirect(uri, newURI, altURIs string, usedMirror bool) {
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
 	fmt.Fprintf(mw.w, "103 Redirect\nURI: %s\nNew-URI: %s\n", uri, newURI)
 	if usedMirror {
 		mw.w.Write([]byte("UsedMirror: true\n"))
@@ -342,6 +354,8 @@ func (mw *MessageWriter) Redirect(uri, newURI, altURIs string, usedMirror bool) 
 
 // Warning writes a '104 Warning' message.
 func (mw *MessageWriter) Warning(msg string) {
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
 	fmt.Fprintf(mw.w, "104 Warning\nMessage: %s\n\n", msg)
 }
 
@@ -352,6 +366,8 @@ func (mw *MessageWriter) Warningf(fmtspec string, args ...interface{}) {
 
 // StartURI writes a '200 URI Start' message.
 func (mw *MessageWriter) StartURI(uri, resumePoint string, size int64, usedMirror bool) {
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
 	fmt.Fprintf(mw.w, "200 URI Start\nURI: %s\n", uri)
 	if resumePoint != "" {
 		fmt.Fprintf(mw.w, "Resume-Point: %s\n", resumePoint)
@@ -368,6 +384,8 @@ func (mw *MessageWriter) StartURI(uri, resumePoint string, size int64, usedMirro
 // FinishURI writes a '201 URI Done' message.
 func (mw *MessageWriter) FinishURI(uri, filename, resumePoint, altIMSHit string,
 	imsHit, usedMirror bool, extra ...Field) {
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
 
 	fmt.Fprintf(mw.w, "201 URI Done\nURI: %s\nFilename: %s\n", uri, filename)
 	if resumePoint != "" {
@@ -393,6 +411,8 @@ func (mw *MessageWriter) FinishURI(uri, filename, resumePoint, altIMSHit string,
 
 // AuxRequest writes a '351 Aux Request' message.
 func (mw *MessageWriter) AuxRequest(uri, auxURI, descShort, descLong string, maximumSize uint64, usedMirror bool) {
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
 	fmt.Fprintf(mw.w, "351 Aux Request\nURI: %s\n", uri)
 	if auxURI != "" {
 		fmt.Fprintf(mw.w, "Aux-URI: %s\n", auxURI)
@@ -418,6 +438,8 @@ func (mw *MessageWriter) AuxRequest(uri, auxURI, descShort, descLong string, max
 // URI Failure message
 // failReason is only used if transientError is false
 func (mw *MessageWriter) FailedURI(uri, message, failReason string, transientError, usedMirror bool) {
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
 	mw.w.Write([]byte("400 URI Failure\n"))
 	if uri == "" {
 		fmt.Fprintf(mw.w, "Message: %s\n\n", message)
@@ -438,6 +460,8 @@ func (mw *MessageWriter) FailedURI(uri, message, failReason string, transientErr
 
 // GeneralFailure writes a '401 General Failure' message.
 func (mw *MessageWriter) GeneralFailure(msg string) {
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
 	fmt.Fprintf(mw.w, "401 General Failure\nMessage: %s\n\n", msg)
 }
 
@@ -449,5 +473,7 @@ func (mw *MessageWriter) GeneralFailuref(fmtspec string, args ...interface{}) {
 
 // MediaChange writes a '403 Media Change' message.
 func (mw *MessageWriter) MediaChange(media, drive string) {
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
 	fmt.Fprintf(mw.w, "403 Media Change\nMedia: %s\nDrive: %s\n\n", media, drive)
 }

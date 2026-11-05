@@ -12,6 +12,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/AkihiroSuda/apt-transport-oci/pkg/apt"
 	"github.com/AkihiroSuda/apt-transport-oci/pkg/dockerconfigresolver"
@@ -59,18 +60,18 @@ type Method struct {
 	w *apt.MessageWriter
 	r *apt.MessageReader
 
+	// each ref is resolved only once at a time
+	cacheMu sync.Mutex
 	// no need to consider cache invalidation, as the process lifecycle is short
 	cacheByOCIRef map[string]cacheByOCIRef
-
-	// TODO: add multi-threading with mutex to support CapPipeLine
 }
 
 // Run is based on https://github.com/cloudflare/apt-transport-cloudflared/blob/96e1417f9c54/apt/method.go#L77-L108
 func (m *Method) Run(ctx context.Context) {
 	version := fmt.Sprintf("%d.%d", version.Major, version.Minor)
-	// TODO: enable apt.CapPipeline
-	var caps apt.CapFlags
-	m.w.Capabilities(version, caps)
+	m.w.Capabilities(version, apt.CapPipeline)
+	var requests sync.WaitGroup
+	defer requests.Wait()
 	for {
 		msg, err := m.r.ReadMessage()
 		if err != nil {
@@ -86,7 +87,7 @@ func (m *Method) Run(ctx context.Context) {
 		}
 		switch msg.StatusCode {
 		case CodeURIAcquire:
-			m.handleURIAcquire(ctx, msg)
+			requests.Go(func() { m.handleURIAcquire(ctx, msg) })
 		default:
 			m.w.Logf("Unknown message: %d %s", msg.StatusCode, msg.Description)
 		}
@@ -256,6 +257,8 @@ func (m *Method) Statusf(uri, fmtspec string, args ...interface{}) {
 }
 
 func (m *Method) doCacheStuff(ctx context.Context, uri string, ociRef refdocker.Named) (*cacheByOCIRef, error) {
+	m.cacheMu.Lock()
+	defer m.cacheMu.Unlock()
 	if x, ok := m.cacheByOCIRef[ociRef.String()]; ok {
 		return &x, nil
 	}
