@@ -322,7 +322,7 @@ func (mw *MessageWriter) Log(msg string) {
 }
 
 // Logf writes a '101 Log' message and formats the arguments into it.
-func (mw *MessageWriter) Logf(fmtspec string, args ...interface{}) {
+func (mw *MessageWriter) Logf(fmtspec string, args ...any) {
 	mw.Log(fmt.Sprintf(fmtspec, args...))
 }
 
@@ -334,7 +334,7 @@ func (mw *MessageWriter) Status(msg string) {
 }
 
 // Statusf writes a '102 status' message and formats the arguments into if.
-func (mw *MessageWriter) Statusf(fmtspec string, args ...interface{}) {
+func (mw *MessageWriter) Statusf(fmtspec string, args ...any) {
 	mw.Status(fmt.Sprintf(fmtspec, args...))
 }
 
@@ -360,7 +360,7 @@ func (mw *MessageWriter) Warning(msg string) {
 }
 
 // Warningf writes a '104 Warning' message and formats the arguments into it.
-func (mw *MessageWriter) Warningf(fmtspec string, args ...interface{}) {
+func (mw *MessageWriter) Warningf(fmtspec string, args ...any) {
 	mw.Warning(fmt.Sprintf(fmtspec, args...))
 }
 
@@ -467,7 +467,7 @@ func (mw *MessageWriter) GeneralFailure(msg string) {
 
 // GeneralFailuref writes a '401 General Failure' message and formats the
 // arguments into it.
-func (mw *MessageWriter) GeneralFailuref(fmtspec string, args ...interface{}) {
+func (mw *MessageWriter) GeneralFailuref(fmtspec string, args ...any) {
 	mw.GeneralFailure(fmt.Sprintf(fmtspec, args...))
 }
 

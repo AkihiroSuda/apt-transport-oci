@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -148,7 +147,7 @@ func buildFileMap(ctx context.Context, fetcher remotes.Fetcher, rootDesc ocispec
 					return nil, err
 				}
 				defer r.Close()
-				b, err := ioutil.ReadAll(r)
+				b, err := io.ReadAll(r)
 				if err != nil {
 					return nil, err
 				}
@@ -168,7 +167,7 @@ func buildFileMap(ctx context.Context, fetcher remotes.Fetcher, rootDesc ocispec
 					return nil, err
 				}
 				defer r.Close()
-				b, err := ioutil.ReadAll(r)
+				b, err := io.ReadAll(r)
 				if err != nil {
 					return nil, err
 				}
@@ -255,7 +254,7 @@ func (m *Method) Status(uri, s string) {
 	m.w.WriteMessage(msg)
 }
 
-func (m *Method) Statusf(uri, fmtspec string, args ...interface{}) {
+func (m *Method) Statusf(uri, fmtspec string, args ...any) {
 	m.Status(uri, fmt.Sprintf(fmtspec, args...))
 }
 
@@ -390,7 +389,7 @@ func (m *Method) acquire(ctx context.Context, msg *apt.Message) (started bool, e
 		imsHit    = false
 	)
 	fields := []apt.Field{
-		{Key: FieldSize, Value: strconv.Itoa(int(desc.Size))},
+		{Key: FieldSize, Value: strconv.FormatInt(desc.Size, 10)},
 		{Key: FieldSHA256Hash, Value: sha256Digest.Encoded()},
 		{Key: FieldSHA512Hash, Value: sha512Digest.Encoded()},
 	}
