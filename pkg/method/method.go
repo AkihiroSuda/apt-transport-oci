@@ -27,14 +27,17 @@ import (
 // Protocol: see https://justi.cz/security/2019/01/22/apt-rce.html
 // See also the output of `apt-get -o Debug::pkgAcquire::Worker=1 update`
 const (
-	CodeURIAcquire     = 600
-	FieldURI           = "URI"
-	FieldMessage       = "Message"
-	FieldTargetRepoURI = "Target-Repo-URI"
-	FieldFilename      = "Filename"
-	FieldSize          = "Size"
-	FieldSHA256Hash    = "SHA256-Hash"
-	FieldSHA512Hash    = "SHA512-Hash"
+	CodeURIAcquire        = 600
+	FieldURI              = "URI"
+	FieldMessage          = "Message"
+	FieldTargetRepoURI    = "Target-Repo-URI"
+	FieldFilename         = "Filename"
+	FieldSize             = "Size"
+	FieldSHA256Hash       = "SHA256-Hash"
+	FieldExpectedSHA256   = "Expected-SHA256"
+	FieldSHA512Hash       = "SHA512-Hash"
+	FieldExpectedSHA512   = "Expected-SHA512"
+	FieldExpectedFileSize = "Expected-Checksum-FileSize"
 )
 
 const (
@@ -289,10 +292,29 @@ func (m *Method) doCacheStuff(ctx context.Context, uri string, ociRef refdocker.
 	return &c, nil
 }
 
+func expectedBlob(msg *apt.Message) (ocispec.Descriptor, bool) {
+	size, err := strconv.ParseInt(msg.Fields[FieldExpectedFileSize], 10, 64)
+	if err != nil || size < 0 {
+		return ocispec.Descriptor{}, false
+	}
+	for _, dgst := range []digest.Digest{
+		digest.NewDigestFromEncoded(digest.SHA256, msg.Fields[FieldExpectedSHA256]),
+		digest.NewDigestFromEncoded(digest.SHA512, msg.Fields[FieldExpectedSHA512]),
+	} {
+		if dgst.Validate() == nil {
+			return ocispec.Descriptor{
+				MediaType: MediaTypeApplicationOctetStream,
+				Digest:    dgst,
+				Size:      size,
+			}, true
+		}
+	}
+	return ocispec.Descriptor{}, false
+}
+
 func (m *Method) acquire(ctx context.Context, msg *apt.Message) (started bool, err error) {
 	uri := msg.Fields[FieldURI]
 	filename := msg.Fields[FieldFilename]
-	// TODO: support "Expected-SHA256"
 
 	m.Statusf(uri, "Parsing msg: %+v", msg)
 	ociRef, title, err := parseURIFields(msg)
@@ -306,6 +328,9 @@ func (m *Method) acquire(ctx context.Context, msg *apt.Message) (started bool, e
 	}
 
 	desc, ok := c.fileMap[title]
+	if !ok {
+		desc, ok = expectedBlob(msg)
+	}
 	if !ok {
 		return started, fmt.Errorf("file not found in %q: %q", ociRef, title)
 	}

@@ -1,6 +1,61 @@
 package method
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/AkihiroSuda/apt-transport-oci/pkg/apt"
+)
+
+func TestExpectedBlob(t *testing.T) {
+	// Digests of the empty file
+	const (
+		sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		sha512 = "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
+	)
+
+	type testCase struct {
+		v       map[string]string
+		xDigest string // empty if no blob is expected
+	}
+
+	for name, tc := range map[string]testCase{
+		"sha256": {
+			v:       map[string]string{FieldExpectedSHA256: sha256, FieldExpectedFileSize: "0"},
+			xDigest: "sha256:" + sha256,
+		},
+		"sha512": {
+			v:       map[string]string{FieldExpectedSHA512: sha512, FieldExpectedFileSize: "0"},
+			xDigest: "sha512:" + sha512,
+		},
+		"sha256 preferred over sha512": {
+			v:       map[string]string{FieldExpectedSHA256: sha256, FieldExpectedSHA512: sha512, FieldExpectedFileSize: "0"},
+			xDigest: "sha256:" + sha256,
+		},
+		"missing hash": {
+			v: map[string]string{FieldExpectedFileSize: "0"},
+		},
+		"missing size": {
+			v: map[string]string{FieldExpectedSHA256: sha256},
+		},
+		"malformed hash": {
+			v: map[string]string{FieldExpectedSHA256: "../../x", FieldExpectedFileSize: "0"},
+		},
+		"negative size": {
+			v: map[string]string{FieldExpectedSHA256: sha256, FieldExpectedFileSize: "-1"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			desc, ok := expectedBlob(&apt.Message{Fields: tc.v})
+			if ok != (tc.xDigest != "") {
+				t.Fatalf("expected ok=%v, got %v", tc.xDigest != "", ok)
+			}
+
+			if desc.Digest.String() != tc.xDigest {
+				t.Fatalf("expected digest %q, got %q", tc.xDigest, desc.Digest)
+			}
+		})
+	}
+}
 
 func TestParseURI(t *testing.T) {
 	type testCase struct {
