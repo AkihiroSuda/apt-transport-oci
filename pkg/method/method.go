@@ -7,11 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/AkihiroSuda/apt-transport-oci/pkg/apt"
 	"github.com/AkihiroSuda/apt-transport-oci/pkg/dockerconfigresolver"
@@ -26,14 +26,17 @@ import (
 // Protocol: see https://justi.cz/security/2019/01/22/apt-rce.html
 // See also the output of `apt-get -o Debug::pkgAcquire::Worker=1 update`
 const (
-	CodeURIAcquire     = 600
-	FieldURI           = "URI"
-	FieldMessage       = "Message"
-	FieldTargetRepoURI = "Target-Repo-URI"
-	FieldFilename      = "Filename"
-	FieldSize          = "Size"
-	FieldSHA256Hash    = "SHA256-Hash"
-	FieldSHA512Hash    = "SHA512-Hash"
+	CodeURIAcquire        = 600
+	FieldURI              = "URI"
+	FieldMessage          = "Message"
+	FieldTargetRepoURI    = "Target-Repo-URI"
+	FieldFilename         = "Filename"
+	FieldSize             = "Size"
+	FieldSHA256Hash       = "SHA256-Hash"
+	FieldExpectedSHA256   = "Expected-SHA256"
+	FieldSHA512Hash       = "SHA512-Hash"
+	FieldExpectedSHA512   = "Expected-SHA512"
+	FieldExpectedFileSize = "Expected-Checksum-FileSize"
 )
 
 const (
@@ -59,18 +62,18 @@ type Method struct {
 	w *apt.MessageWriter
 	r *apt.MessageReader
 
+	// each ref is resolved only once at a time
+	cacheMu sync.Mutex
 	// no need to consider cache invalidation, as the process lifecycle is short
 	cacheByOCIRef map[string]cacheByOCIRef
-
-	// TODO: add multi-threading with mutex to support CapPipeLine
 }
 
 // Run is based on https://github.com/cloudflare/apt-transport-cloudflared/blob/96e1417f9c54/apt/method.go#L77-L108
 func (m *Method) Run(ctx context.Context) {
 	version := fmt.Sprintf("%d.%d", version.Major, version.Minor)
-	// TODO: enable apt.CapPipeline
-	var caps apt.CapFlags
-	m.w.Capabilities(version, caps)
+	m.w.Capabilities(version, apt.CapPipeline)
+	var requests sync.WaitGroup
+	defer requests.Wait()
 	for {
 		msg, err := m.r.ReadMessage()
 		if err != nil {
@@ -86,7 +89,7 @@ func (m *Method) Run(ctx context.Context) {
 		}
 		switch msg.StatusCode {
 		case CodeURIAcquire:
-			m.handleURIAcquire(ctx, msg)
+			requests.Go(func() { m.handleURIAcquire(ctx, msg) })
 		default:
 			m.w.Logf("Unknown message: %d %s", msg.StatusCode, msg.Description)
 		}
@@ -144,7 +147,7 @@ func buildFileMap(ctx context.Context, fetcher remotes.Fetcher, rootDesc ocispec
 					return nil, err
 				}
 				defer r.Close()
-				b, err := ioutil.ReadAll(r)
+				b, err := io.ReadAll(r)
 				if err != nil {
 					return nil, err
 				}
@@ -164,7 +167,7 @@ func buildFileMap(ctx context.Context, fetcher remotes.Fetcher, rootDesc ocispec
 					return nil, err
 				}
 				defer r.Close()
-				b, err := ioutil.ReadAll(r)
+				b, err := io.ReadAll(r)
 				if err != nil {
 					return nil, err
 				}
@@ -251,11 +254,13 @@ func (m *Method) Status(uri, s string) {
 	m.w.WriteMessage(msg)
 }
 
-func (m *Method) Statusf(uri, fmtspec string, args ...interface{}) {
+func (m *Method) Statusf(uri, fmtspec string, args ...any) {
 	m.Status(uri, fmt.Sprintf(fmtspec, args...))
 }
 
 func (m *Method) doCacheStuff(ctx context.Context, uri string, ociRef refdocker.Named) (*cacheByOCIRef, error) {
+	m.cacheMu.Lock()
+	defer m.cacheMu.Unlock()
 	if x, ok := m.cacheByOCIRef[ociRef.String()]; ok {
 		return &x, nil
 	}
@@ -286,10 +291,29 @@ func (m *Method) doCacheStuff(ctx context.Context, uri string, ociRef refdocker.
 	return &c, nil
 }
 
+func expectedBlob(msg *apt.Message) (ocispec.Descriptor, bool) {
+	size, err := strconv.ParseInt(msg.Fields[FieldExpectedFileSize], 10, 64)
+	if err != nil || size < 0 {
+		return ocispec.Descriptor{}, false
+	}
+	for _, dgst := range []digest.Digest{
+		digest.NewDigestFromEncoded(digest.SHA256, msg.Fields[FieldExpectedSHA256]),
+		digest.NewDigestFromEncoded(digest.SHA512, msg.Fields[FieldExpectedSHA512]),
+	} {
+		if dgst.Validate() == nil {
+			return ocispec.Descriptor{
+				MediaType: MediaTypeApplicationOctetStream,
+				Digest:    dgst,
+				Size:      size,
+			}, true
+		}
+	}
+	return ocispec.Descriptor{}, false
+}
+
 func (m *Method) acquire(ctx context.Context, msg *apt.Message) (started bool, err error) {
 	uri := msg.Fields[FieldURI]
 	filename := msg.Fields[FieldFilename]
-	// TODO: support "Expected-SHA256"
 
 	m.Statusf(uri, "Parsing msg: %+v", msg)
 	ociRef, title, err := parseURIFields(msg)
@@ -303,6 +327,9 @@ func (m *Method) acquire(ctx context.Context, msg *apt.Message) (started bool, e
 	}
 
 	desc, ok := c.fileMap[title]
+	if !ok {
+		desc, ok = expectedBlob(msg)
+	}
 	if !ok {
 		return started, fmt.Errorf("file not found in %q: %q", ociRef, title)
 	}
@@ -362,7 +389,7 @@ func (m *Method) acquire(ctx context.Context, msg *apt.Message) (started bool, e
 		imsHit    = false
 	)
 	fields := []apt.Field{
-		{Key: FieldSize, Value: strconv.Itoa(int(desc.Size))},
+		{Key: FieldSize, Value: strconv.FormatInt(desc.Size, 10)},
 		{Key: FieldSHA256Hash, Value: sha256Digest.Encoded()},
 		{Key: FieldSHA512Hash, Value: sha512Digest.Encoded()},
 	}
