@@ -138,6 +138,7 @@ func (m *Method) ociFetcher(ctx context.Context, named refdocker.Named, resolver
 
 func buildFileMap(ctx context.Context, fetcher remotes.Fetcher, rootDesc ocispec.Descriptor) (map[string]ocispec.Descriptor, error) {
 	files := make(map[string]ocispec.Descriptor)
+	var filesMu sync.Mutex
 	handler := images.HandlerFunc(
 		func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 			switch desc.MediaType {
@@ -155,12 +156,14 @@ func buildFileMap(ctx context.Context, fetcher remotes.Fetcher, rootDesc ocispec
 				if err := json.Unmarshal(b, &manifest); err != nil {
 					return nil, err
 				}
+				filesMu.Lock()
 				for _, l := range manifest.Layers {
 					if title := l.Annotations[ocispec.AnnotationTitle]; title != "" {
 						cleanPath := path.Clean(title)
 						files[cleanPath] = l
 					}
 				}
+				filesMu.Unlock()
 			case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
 				r, err := fetcher.Fetch(ctx, desc)
 				if err != nil {
