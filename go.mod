@@ -4,11 +4,11 @@ go 1.26.6
 
 require (
 	github.com/containerd/containerd/v2 v2.4.2
-	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v29.9.3+incompatible
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/sirupsen/logrus v1.10.2
+	golang.org/x/sync v0.24.0
 	oras.land/oras-go/v2 v2.7.0
 )
 
@@ -31,7 +31,6 @@ require (
 	go.opentelemetry.io/otel v1.46.0 // indirect
 	go.opentelemetry.io/otel/metric v1.46.0 // indirect
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260825221802-da73d73af1c5 // indirect
 	google.golang.org/grpc v1.83.2 // indirect

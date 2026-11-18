@@ -63,8 +63,10 @@ Hello, apt-transport-oci
 ```
 
 ## Hints
-- Create `/root/.docker/config.json` to enable authentication.
+- URIs take full OCI references, `oci://REGISTRY/REPOSITORY:TAG`. Docker Hub short names are not expanded: write `oci://docker.io/library/ubuntu:noble`, not `oci://ubuntu:noble`.
+- Create `/root/.docker/config.json` to enable authentication. Like apt's `auth.conf`, it is read as root; credential helpers run as `_apt`.
 - Non-TLS registry is supported only for 127.0.0.1
+- A request fails after 30 seconds without progress. Change it with `Acquire::oci::Timeout`, or for one registry with `Acquire::oci::<host>::Timeout`, e.g. `Acquire::oci::ghcr.io::Timeout "60";`.
 - Troubleshooting: Run `apt-get -o Debug::pkgAcquire::Worker=1 update 2>&1` and grep `FailReason`
 
 ## Specification
