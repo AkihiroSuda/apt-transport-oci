@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	"github.com/AkihiroSuda/apt-transport-oci/pkg/apt"
+	"github.com/opencontainers/go-digest"
 )
 
-func TestExpectedBlob(t *testing.T) {
+func TestExpectedDigest(t *testing.T) {
 	// Digests of the empty file
 	const (
 		sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -16,47 +17,29 @@ func TestExpectedBlob(t *testing.T) {
 
 	type testCase struct {
 		v       map[string]string
-		xDigest string // empty if no blob is expected
+		alg     digest.Algorithm // the registry's
+		xDigest string           // empty if apt sent no usable hash
 	}
 
+	both := map[string]string{FieldExpectedSHA256: sha256, FieldExpectedSHA512: sha512}
 	for name, tc := range map[string]testCase{
-		"sha256": {
-			v:       map[string]string{FieldExpectedSHA256: sha256, FieldExpectedFileSize: "0"},
-			xDigest: "sha256:" + sha256,
-		},
-		"sha512": {
-			v:       map[string]string{FieldExpectedSHA512: sha512, FieldExpectedFileSize: "0"},
-			xDigest: "sha512:" + sha512,
-		},
-		"sha256 preferred over sha512": {
-			v:       map[string]string{FieldExpectedSHA256: sha256, FieldExpectedSHA512: sha512, FieldExpectedFileSize: "0"},
-			xDigest: "sha256:" + sha256,
-		},
-		"missing hash": {
-			v: map[string]string{FieldExpectedFileSize: "0"},
-		},
-		"missing size": {
-			v: map[string]string{FieldExpectedSHA256: sha256},
-		},
-		"malformed hash": {
-			v: map[string]string{FieldExpectedSHA256: "../../x", FieldExpectedFileSize: "0"},
-		},
-		"negative size": {
-			v: map[string]string{FieldExpectedSHA256: sha256, FieldExpectedFileSize: "-1"},
-		},
+		"sha256":          {map[string]string{FieldExpectedSHA256: sha256}, digest.SHA256, "sha256:" + sha256},
+		"sha512":          {map[string]string{FieldExpectedSHA512: sha512}, digest.SHA512, "sha512:" + sha512},
+		"both, sha256":    {both, digest.SHA256, "sha256:" + sha256},
+		"both, sha512":    {both, digest.SHA512, "sha512:" + sha512},
+		"sha512 only":     {map[string]string{FieldExpectedSHA512: sha512}, digest.SHA256, ""},
+		"other algorithm": {both, digest.Algorithm("blake3"), ""},
+		"missing hash":    {map[string]string{FieldExpectedFileSize: "0"}, digest.SHA256, ""},
+		"malformed hash":  {map[string]string{FieldExpectedSHA256: "../../x"}, digest.SHA256, ""},
 	} {
 		t.Run(name, func(t *testing.T) {
 			fields := textproto.MIMEHeader{}
 			for key, value := range tc.v {
 				fields.Set(key, value)
 			}
-			desc, ok := expectedBlob(&apt.Message{Fields: fields})
-			if ok != (tc.xDigest != "") {
-				t.Fatalf("expected ok=%v, got %v", tc.xDigest != "", ok)
-			}
-
-			if desc.Digest.String() != tc.xDigest {
-				t.Fatalf("expected digest %q, got %q", tc.xDigest, desc.Digest)
+			dgst, ok := expectedDigest(&apt.Message{Fields: fields}, tc.alg)
+			if ok != (tc.xDigest != "") || (ok && dgst.String() != tc.xDigest) {
+				t.Fatalf("expected %q, got %q (ok=%v)", tc.xDigest, dgst, ok)
 			}
 		})
 	}

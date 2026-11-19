@@ -8,7 +8,6 @@ import (
 
 	"github.com/AkihiroSuda/apt-transport-oci/pkg/apt"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	orasregistry "oras.land/oras-go/v2/registry"
 )
 
@@ -28,14 +27,8 @@ func parseURI(uri string) (repo, path string, _ error) {
 		return "", "", errors.New("uri is missing repo tag")
 	}
 
-	// Combine everything up to but not including the tag
-	// We don't quite have the tag yet because it (should) have a file path added
-	// to the end that we need to split off first.
-	repo = "oci://" + trimmed[:i+1]
+	// The path follows the tag; the repo keeps the "/" between them.
 	tagAndFile := strings.SplitN(trimmed[i+1:], "/", 2)
-
-	// We add "/" here, otherwise we'll end up with an extra preceding "/" on the
-	// file name later which we don't want and will cause the file to not be found.
 	repo = scheme + trimmed[:i+1] + tagAndFile[0] + "/"
 	if len(tagAndFile) > 1 {
 		path = tagAndFile[1]
@@ -72,24 +65,20 @@ func parseURIFields(msg *apt.Message) (ociRef orasregistry.Reference, title stri
 	return ociRef, title, nil
 }
 
-func expectedBlob(msg *apt.Message) (ocispec.Descriptor, bool) {
-	size, err := strconv.ParseInt(msg.Fields.Get(FieldExpectedFileSize), 10, 64)
-	if err != nil || size < 0 {
-		return ocispec.Descriptor{}, false
+// expectedFields are the fields of the hashes apt expects, by algorithm.
+var expectedFields = map[digest.Algorithm]string{
+	digest.SHA256: FieldExpectedSHA256,
+	digest.SHA512: FieldExpectedSHA512,
+}
+
+// expectedDigest is apt's hash in alg, the registry's algorithm.
+func expectedDigest(msg *apt.Message, alg digest.Algorithm) (digest.Digest, bool) {
+	field, ok := expectedFields[alg]
+	if !ok {
+		return "", false
 	}
-	for _, dgst := range []digest.Digest{
-		digest.NewDigestFromEncoded(digest.SHA256, msg.Fields.Get(FieldExpectedSHA256)),
-		digest.NewDigestFromEncoded(digest.SHA512, msg.Fields.Get(FieldExpectedSHA512)),
-	} {
-		if dgst.Validate() == nil {
-			return ocispec.Descriptor{
-				MediaType: MediaTypeApplicationOctetStream,
-				Digest:    dgst,
-				Size:      size,
-			}, true
-		}
-	}
-	return ocispec.Descriptor{}, false
+	expected := digest.NewDigestFromEncoded(alg, msg.Fields.Get(field))
+	return expected, expected.Validate() == nil
 }
 
 // maximumSize is the size apt allows for the file, or 0 for none, as apt's
